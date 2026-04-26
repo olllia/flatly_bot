@@ -1,4 +1,4 @@
-# Flatly Bot (Fly.io Ready)
+# Flatly Bot (Timeweb Ready)
 
 Telegram-бот для публикации объявлений аренды жилья:
 - анкета через FSM;
@@ -30,57 +30,28 @@ Telegram-бот для публикации объявлений аренды ж
 ./stop_bot.sh
 ```
 
-## Fly.io деплой
+## Timeweb деплой (Cloud Apps)
 
-1. Установи Fly CLI и залогинься:
-
-```bash
-fly auth login
-```
-
-2. (Опционально) измени имя приложения в `fly.toml` (`app = "flatly-bot"`), если имя занято.
-3. Создай приложение:
-
-```bash
-fly apps create <your-app-name>
-```
-
-4. Создай Postgres на Fly:
-
-```bash
-fly postgres create --name <your-pg-name> --region waw
-fly postgres attach --app <your-app-name> <your-pg-name>
-```
-
-5. Добавь секреты:
-
-```bash
-fly secrets set BOT_TOKEN=... ADMIN_ID=381232429 CHANNEL_ID=-1003983913190
-```
-
-6. Проверь `DATABASE_URL` в secrets и приведи к формату `postgresql+asyncpg://...`:
-   - если в секрете `postgres://...`, замени префикс:
-
-```bash
-fly secrets set DATABASE_URL=postgresql+asyncpg://USER:PASSWORD@HOST:5432/DB_NAME
-```
-
-7. Запусти деплой:
-
-```bash
-fly deploy
-```
-
-8. Логи:
-
-```bash
-fly logs
-```
+1. Запушь проект в GitHub.
+2. В панели Timeweb открой `Cloud Apps` -> `Создать приложение` -> `Из GitHub`.
+3. Выбери репозиторий с ботом.
+4. В настройках приложения укажи:
+   - Build command: `pip install -r requirements.txt`
+   - Start command: `alembic upgrade head && python -m app.bot`
+5. Создай PostgreSQL в Timeweb Cloud и скопируй строку подключения.
+6. В переменные окружения приложения добавь:
+   - `BOT_TOKEN`
+   - `ADMIN_ID`
+   - `CHANNEL_ID`
+   - `DATABASE_URL` в формате `postgresql+asyncpg://...`
+7. Запусти деплой.
 
 В логах должно быть:
 - `Bot started`
 - `Start polling`
 - `Run polling for bot ...`
+
+Если дали URL с префиксом `postgres://`, замени на `postgresql+asyncpg://`.
 
 ## Публикация на GitHub
 
