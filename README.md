@@ -1,4 +1,4 @@
-# Flatly Bot (Railway Ready)
+# Flatly Bot (Render Ready)
 
 Telegram-бот для публикации объявлений аренды жилья:
 - анкета через FSM;
@@ -30,18 +30,21 @@ Telegram-бот для публикации объявлений аренды ж
 ./stop_bot.sh
 ```
 
-## Railway деплой
+## Render деплой
 
 1. Создай GitHub-репозиторий и запушь проект.
-2. В Railway создай проект `Deploy from GitHub Repo`.
-3. Добавь PostgreSQL плагин в Railway.
-4. В Variables у сервиса бота задай:
+2. В Render нажми `New +` -> `Background Worker`.
+3. Подключи GitHub-репозиторий.
+4. Render подхватит `render.yaml` и создаст worker со стартом:
+   - `alembic upgrade head && python -m app.bot`
+5. Создай PostgreSQL в Render (`New +` -> `PostgreSQL`) и скопируй `External Database URL`.
+6. В Variables у воркера задай:
    - `BOT_TOKEN`
    - `ADMIN_ID`
    - `CHANNEL_ID`
-   - `DATABASE_URL` (в формате `postgresql+asyncpg://...`)
-5. Railway использует `railway.json`/`Procfile` и запустит:
-   - `alembic upgrade head && python -m app.bot`
+   - `DATABASE_URL` в формате `postgresql+asyncpg://...`
+     (если Render дал `postgres://...`, замени префикс на `postgresql+asyncpg://`)
+7. Нажми `Manual Deploy` -> `Deploy latest commit`.
 
 ## Публикация на GitHub
 
