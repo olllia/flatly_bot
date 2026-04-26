@@ -1,0 +1,64 @@
+from app.keyboards.listing_form import AMENITIES, OWNER_TYPES, PROPERTY_TYPES
+
+TRAVEL_TYPES_RU = {
+    "walk": "пешком",
+    "transport": "на транспорте",
+}
+
+
+def format_listing_text(data: dict, username: str) -> str:
+    property_type = PROPERTY_TYPES.get(data["property_type"], data["property_type"]).lower()
+    owner_type = OWNER_TYPES.get(data["owner_type"], data["owner_type"])
+    travel_type = TRAVEL_TYPES_RU.get(data["travel_type"], data["travel_type"])
+    selected_amenities = set(data.get("amenities", []))
+    amenities_parts = []
+    for item in AMENITIES:
+        if item in selected_amenities:
+            amenities_parts.append(item)
+        else:
+            amenities_parts.append(f"<s>{item}</s>")
+    amenities = " • ".join(amenities_parts)
+
+    metro_tag = str(data.get("metro", "")).replace(" ", "_")
+    travel_tag = "#до30" if int(data.get("travel_time", 0) or 0) <= 30 else "#дольше30"
+    rooms_value = int(float(data.get("rooms", 1) or 1))
+    room_tags = {
+        1: "#однушка",
+        2: "#двушка",
+        3: "#трешка",
+        4: "#4комнаты",
+        5: "#5комнат",
+        6: "#6комнат",
+    }
+    room_tag = room_tags.get(rooms_value, "#квартира")
+
+    return (
+        f"{data['rooms']}-к {property_type}, {data['area']} м2 | {data['price']} р/мес\n\n"
+        f"м. {data['metro']}\n\n"
+        f"* {data['travel_time']} минут {travel_type}\n"
+        f"* {data['floor']}\n"
+        f"* {data['address']}\n\n"
+        f"{owner_type}\n\n"
+        f"{data['description']}\n\n"
+        f"{amenities}\n\n"
+        f"Контакт: @{username}\n\n"
+        f"#{metro_tag} {travel_tag} {room_tag} #аренда"
+    )
+
+
+def listing_to_text_payload(listing) -> dict:
+    amenities = listing.amenities or []
+    return {
+        "property_type": listing.property_type.value if listing.property_type else "",
+        "owner_type": listing.owner_type.value if listing.owner_type else "",
+        "area": listing.area,
+        "rooms": listing.rooms,
+        "price": listing.price,
+        "floor": listing.floor,
+        "metro": listing.metro,
+        "travel_type": listing.travel_type,
+        "travel_time": listing.travel_time,
+        "address": listing.address,
+        "description": listing.description,
+        "amenities": amenities,
+    }
