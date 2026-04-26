@@ -1,4 +1,4 @@
-# Flatly Bot (Render Ready)
+# Flatly Bot (Fly.io Ready)
 
 Telegram-бот для публикации объявлений аренды жилья:
 - анкета через FSM;
@@ -30,21 +30,57 @@ Telegram-бот для публикации объявлений аренды ж
 ./stop_bot.sh
 ```
 
-## Render деплой
+## Fly.io деплой
 
-1. Создай GitHub-репозиторий и запушь проект.
-2. В Render нажми `New +` -> `Background Worker`.
-3. Подключи GitHub-репозиторий.
-4. Render подхватит `render.yaml` и создаст worker со стартом:
-   - `alembic upgrade head && python -m app.bot`
-5. Создай PostgreSQL в Render (`New +` -> `PostgreSQL`) и скопируй `External Database URL`.
-6. В Variables у воркера задай:
-   - `BOT_TOKEN`
-   - `ADMIN_ID`
-   - `CHANNEL_ID`
-   - `DATABASE_URL` в формате `postgresql+asyncpg://...`
-     (если Render дал `postgres://...`, замени префикс на `postgresql+asyncpg://`)
-7. Нажми `Manual Deploy` -> `Deploy latest commit`.
+1. Установи Fly CLI и залогинься:
+
+```bash
+fly auth login
+```
+
+2. (Опционально) измени имя приложения в `fly.toml` (`app = "flatly-bot"`), если имя занято.
+3. Создай приложение:
+
+```bash
+fly apps create <your-app-name>
+```
+
+4. Создай Postgres на Fly:
+
+```bash
+fly postgres create --name <your-pg-name> --region waw
+fly postgres attach --app <your-app-name> <your-pg-name>
+```
+
+5. Добавь секреты:
+
+```bash
+fly secrets set BOT_TOKEN=... ADMIN_ID=381232429 CHANNEL_ID=-1003983913190
+```
+
+6. Проверь `DATABASE_URL` в secrets и приведи к формату `postgresql+asyncpg://...`:
+   - если в секрете `postgres://...`, замени префикс:
+
+```bash
+fly secrets set DATABASE_URL=postgresql+asyncpg://USER:PASSWORD@HOST:5432/DB_NAME
+```
+
+7. Запусти деплой:
+
+```bash
+fly deploy
+```
+
+8. Логи:
+
+```bash
+fly logs
+```
+
+В логах должно быть:
+- `Bot started`
+- `Start polling`
+- `Run polling for bot ...`
 
 ## Публикация на GitHub
 
