@@ -16,15 +16,25 @@ down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
-property_type_enum = sa.Enum("apartment", "room", name="property_type_enum")
-owner_type_enum = sa.Enum("owner", "subrent", "realtor", name="owner_type_enum")
-listing_status_enum = sa.Enum("draft", "moderation", "published", "rejected", name="listing_status_enum")
+property_type_enum = postgresql.ENUM("apartment", "room", name="property_type_enum", create_type=False)
+owner_type_enum = postgresql.ENUM("owner", "subrent", "realtor", name="owner_type_enum", create_type=False)
+listing_status_enum = postgresql.ENUM(
+    "draft",
+    "moderation",
+    "published",
+    "rejected",
+    name="listing_status_enum",
+    create_type=False,
+)
 
 
 def upgrade() -> None:
-    property_type_enum.create(op.get_bind(), checkfirst=True)
-    owner_type_enum.create(op.get_bind(), checkfirst=True)
-    listing_status_enum.create(op.get_bind(), checkfirst=True)
+    bind = op.get_bind()
+    postgresql.ENUM("apartment", "room", name="property_type_enum").create(bind, checkfirst=True)
+    postgresql.ENUM("owner", "subrent", "realtor", name="owner_type_enum").create(bind, checkfirst=True)
+    postgresql.ENUM("draft", "moderation", "published", "rejected", name="listing_status_enum").create(
+        bind, checkfirst=True
+    )
 
     op.create_table(
         "listings",

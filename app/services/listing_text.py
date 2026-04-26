@@ -6,7 +6,18 @@ TRAVEL_TYPES_RU = {
 }
 
 
+def _price_tag(price_value: int) -> str:
+    if price_value <= 0:
+        return "#цена"
+    price_bucket = max(10, ((price_value + 9999) // 10000) * 10)
+    return f"#до{price_bucket}"
+
+
 def format_listing_text(data: dict, username: str) -> str:
+    publication_text = data.get("publication_text")
+    if publication_text:
+        return publication_text
+
     property_type = PROPERTY_TYPES.get(data["property_type"], data["property_type"]).lower()
     owner_type = OWNER_TYPES.get(data["owner_type"], data["owner_type"])
     travel_type = TRAVEL_TYPES_RU.get(data["travel_type"], data["travel_type"])
@@ -20,8 +31,9 @@ def format_listing_text(data: dict, username: str) -> str:
     amenities = " • ".join(amenities_parts)
 
     metro_tag = str(data.get("metro", "")).replace(" ", "_")
-    travel_tag = "#до30" if int(data.get("travel_time", 0) or 0) <= 30 else "#дольше30"
     rooms_value = int(float(data.get("rooms", 1) or 1))
+    price_value = int(data.get("price", 0) or 0)
+    price_tag = _price_tag(price_value)
     room_tags = {
         1: "#однушка",
         2: "#двушка",
@@ -31,9 +43,10 @@ def format_listing_text(data: dict, username: str) -> str:
         6: "#6комнат",
     }
     room_tag = room_tags.get(rooms_value, "#квартира")
+    rooms_display = str(rooms_value)
 
     return (
-        f"{data['rooms']}-к {property_type}, {data['area']} м2 | {data['price']} р/мес\n\n"
+        f"{rooms_display}-к {property_type}, {data['area']} м2 | {data['price']} р/мес\n\n"
         f"м. {data['metro']}\n\n"
         f"* {data['travel_time']} минут {travel_type}\n"
         f"* {data['floor']}\n"
@@ -42,7 +55,7 @@ def format_listing_text(data: dict, username: str) -> str:
         f"{data['description']}\n\n"
         f"{amenities}\n\n"
         f"Контакт: @{username}\n\n"
-        f"#{metro_tag} {travel_tag} {room_tag} #аренда"
+        f"#{metro_tag} {price_tag} {room_tag} #аренда"
     )
 
 
@@ -60,5 +73,6 @@ def listing_to_text_payload(listing) -> dict:
         "travel_time": listing.travel_time,
         "address": listing.address,
         "description": listing.description,
+        "publication_text": listing.publication_text,
         "amenities": amenities,
     }

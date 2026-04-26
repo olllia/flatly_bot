@@ -47,6 +47,7 @@ class Listing(Base):
     travel_time: Mapped[int | None] = mapped_column(Integer, nullable=True)
     address: Mapped[str | None] = mapped_column(String(255), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    publication_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     amenities: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
     photos: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
     status: Mapped[ListingStatus] = mapped_column(

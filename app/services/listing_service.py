@@ -59,7 +59,23 @@ async def update_listing_fields(listing_id: int, payload: dict) -> Listing | Non
         for key, value in payload.items():
             setattr(listing, key, value)
 
+        listing.publication_text = None
         listing.status = ListingStatus.draft
+        await session.commit()
+        await session.refresh(listing)
+        return listing
+
+
+async def update_listing_admin_fields(listing_id: int, payload: dict) -> Listing | None:
+    async with SessionLocal() as session:
+        result = await session.execute(select(Listing).where(Listing.id == listing_id))
+        listing = result.scalar_one_or_none()
+        if listing is None:
+            return None
+
+        for key, value in payload.items():
+            setattr(listing, key, value)
+
         await session.commit()
         await session.refresh(listing)
         return listing

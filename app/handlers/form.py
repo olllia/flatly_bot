@@ -4,6 +4,7 @@ import socket
 from aiogram import Bot, F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
+from aiogram.exceptions import TelegramAPIError
 from aiogram.types import CallbackQuery, InputMediaPhoto, Message, ReplyKeyboardRemove
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -28,6 +29,7 @@ from app.services.listing_service import (
     create_or_update_draft,
     get_listing_by_id,
     set_listing_status,
+    update_listing_admin_fields,
     update_listing_fields,
 )
 from app.services.listing_text import format_listing_text, listing_to_text_payload
@@ -383,7 +385,7 @@ async def preview_actions(callback: CallbackQuery, state: FSMContext, bot: Bot) 
 
 
 @router.callback_query(F.data.startswith("mod:"))
-async def moderation_actions(callback: CallbackQuery, bot: Bot) -> None:
+async def moderation_actions(callback: CallbackQuery, bot: Bot, state: FSMContext) -> None:
     if not callback.data:
         await callback.answer()
         return
@@ -402,13 +404,21 @@ async def moderation_actions(callback: CallbackQuery, bot: Bot) -> None:
         payload = listing_to_text_payload(listing)
         text = format_listing_text(payload, username=listing.username)
         photos = listing.photos or []
-        if photos:
-            media = [InputMediaPhoto(media=file_id) for file_id in photos]
-            await bot.send_media_group(chat_id=settings.channel_id, media=media)
-        await bot.send_message(chat_id=settings.channel_id, text=text)
-        await set_listing_status(listing_id, ListingStatus.published)
-        await bot.send_message(chat_id=listing.user_id, text="Ваше объявление опубликовано.")
-        await callback.answer("Опубликовано")
+        try:
+            if photos:
+                media = [InputMediaPhoto(media=file_id) for file_id in photos]
+                await bot.send_media_group(chat_id=settings.channel_id, media=media)
+            await bot.send_message(chat_id=settings.channel_id, text=text, parse_mode=None if listing.publication_text else "HTML")
+            await set_listing_status(listing_id, ListingStatus.published)
+            await bot.send_message(chat_id=listing.user_id, text="Ваше объявление опубликовано.")
+            logger.info("Listing %s published to channel %s", listing_id, settings.channel_id)
+            await callback.answer("Опубликовано")
+        except TelegramAPIError:
+            logger.exception("Failed to publish listing %s to channel %s", listing_id, settings.channel_id)
+            await callback.message.answer(
+                "Не удалось опубликовать объявление в канал. Проверьте, что бот добавлен в канал и имеет право публиковать сообщения."
+            )
+            await callback.answer("Ошибка публикации", show_alert=True)
         return
 
     if action == "reject":
@@ -427,7 +437,49 @@ async def moderation_actions(callback: CallbackQuery, bot: Bot) -> None:
         await callback.answer("Пользователь уведомлен")
         return
 
+    if action == "edittext":
+        await state.clear()
+        await state.set_state(ListingForm.admin_edit_text)
+        await state.update_data(admin_edit_listing_id=listing.id)
+        await callback.message.answer(
+            "Пришлите полный текст объявления целиком. Он будет использоваться при публикации вместо автосборки."
+        )
+        await callback.answer("Жду текст")
+        return
+
     await callback.answer()
+
+
+@router.message(ListingForm.admin_edit_text)
+async def admin_edit_publication_text(message: Message, state: FSMContext) -> None:
+    if not message.from_user or message.from_user.id != settings.admin_id:
+        await state.clear()
+        await message.answer("Только администратор может редактировать финальный текст.")
+        return
+
+    data = await state.get_data()
+    listing_id = data.get("admin_edit_listing_id")
+    text = (message.text or "").strip()
+    if not listing_id:
+        await state.clear()
+        await message.answer("Сессия редактирования устарела.")
+        return
+    if not text:
+        await message.answer("Текст не должен быть пустым.")
+        return
+    if len(text) > 4000:
+        await message.answer("Текст слишком длинный. Максимум 4000 символов.")
+        return
+
+    updated = await update_listing_admin_fields(int(listing_id), {"publication_text": text})
+    if not updated:
+        await state.clear()
+        await message.answer("Не удалось сохранить текст объявления.")
+        return
+
+    await message.answer("Финальный текст сохранен. Так объявление уйдет в канал:")
+    await message.answer(text, reply_markup=moderation_kb_initial(updated.id), parse_mode=None)
+    await state.clear()
 
 
 @router.callback_query(F.data.startswith("editfield:"))
