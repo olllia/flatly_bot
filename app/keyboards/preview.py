@@ -13,8 +13,8 @@ def preview_kb(listing_id: int) -> InlineKeyboardMarkup:
 def moderation_kb_after_review(listing_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="Опубликовать", callback_data=f"mod:publish:{listing_id}")
-    builder.button(text="Свой текст", callback_data=f"mod:edittext:{listing_id}")
-    builder.button(text="Запросить правки", callback_data=f"mod:edit:{listing_id}")
+    builder.button(text="Редактировать", callback_data=f"mod:edittext:{listing_id}")
+    builder.button(text="Запросить правки", callback_data=f"mod:requestchanges:{listing_id}")
     builder.button(text="Отклонить", callback_data=f"mod:reject:{listing_id}")
     builder.adjust(1)
     return builder.as_markup()
@@ -22,8 +22,8 @@ def moderation_kb_after_review(listing_id: int) -> InlineKeyboardMarkup:
 
 def moderation_kb_initial(listing_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.button(text="Свой текст", callback_data=f"mod:edittext:{listing_id}")
-    builder.button(text="Запросить правки", callback_data=f"mod:edit:{listing_id}")
+    builder.button(text="Редактировать", callback_data=f"mod:edittext:{listing_id}")
+    builder.button(text="Запросить правки", callback_data=f"mod:requestchanges:{listing_id}")
     builder.button(text="Отклонить", callback_data=f"mod:reject:{listing_id}")
     builder.button(text="Опубликовать", callback_data=f"mod:publish:{listing_id}")
     builder.adjust(1)

@@ -433,7 +433,7 @@ async def moderation_actions(callback: CallbackQuery, bot: Bot, state: FSMContex
         await callback.answer("Отклонено")
         return
 
-    if action == "edit":
+    if action == "requestchanges":
         await set_listing_status(listing_id, ListingStatus.draft)
         await bot.send_message(
             chat_id=listing.user_id,
@@ -446,9 +446,13 @@ async def moderation_actions(callback: CallbackQuery, bot: Bot, state: FSMContex
     if action == "edittext":
         await state.clear()
         await state.set_state(ListingForm.admin_edit_text)
-        await state.update_data(admin_edit_listing_id=listing.id)
+        await state.update_data(
+            admin_edit_listing_id=listing.id,
+            admin_edit_chat_id=callback.message.chat.id if callback.message else None,
+            admin_edit_message_id=callback.message.message_id if callback.message else None,
+        )
         await callback.message.answer(
-            "Пришлите полный текст объявления целиком одним сообщением. При публикации он уйдет в подпись к фото или отдельным постом, если фото нет."
+            "Пришлите новый полный текст объявления одним сообщением. Я сохраню его как финальный вариант для публикации."
         )
         await callback.answer("Жду текст")
         return
@@ -457,7 +461,7 @@ async def moderation_actions(callback: CallbackQuery, bot: Bot, state: FSMContex
 
 
 @router.message(ListingForm.admin_edit_text)
-async def admin_edit_publication_text(message: Message, state: FSMContext) -> None:
+async def admin_edit_publication_text(message: Message, state: FSMContext, bot: Bot) -> None:
     if not message.from_user or message.from_user.id != settings.admin_id:
         await state.clear()
         await message.answer("Только администратор может редактировать финальный текст.")
@@ -465,6 +469,8 @@ async def admin_edit_publication_text(message: Message, state: FSMContext) -> No
 
     data = await state.get_data()
     listing_id = data.get("admin_edit_listing_id")
+    chat_id = data.get("admin_edit_chat_id")
+    message_id = data.get("admin_edit_message_id")
     text = (message.text or "").strip()
     if not listing_id:
         await state.clear()
@@ -483,8 +489,21 @@ async def admin_edit_publication_text(message: Message, state: FSMContext) -> No
         await message.answer("Не удалось сохранить текст объявления.")
         return
 
-    await message.answer("Финальный текст сохранен. Так объявление уйдет в канал:")
-    await message.answer(text, reply_markup=moderation_kb_initial(updated.id), parse_mode=None)
+    preview_text = f"Новая заявка на модерацию (ID: {updated.id})\n\n{text}"
+    if chat_id and message_id:
+        try:
+            await bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=preview_text,
+                reply_markup=moderation_kb_initial(updated.id),
+                parse_mode=None,
+            )
+        except TelegramAPIError:
+            logger.exception("Failed to update moderation preview for listing %s", updated.id)
+            await message.answer("Текст сохранен, но превью в сообщении не обновилось.")
+
+    await message.answer("Готово. Обновила текст объявления для публикации.")
     await state.clear()
 
 
