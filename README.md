@@ -30,6 +30,32 @@ Telegram-бот для публикации объявлений аренды ж
 ./stop_bot.sh
 ```
 
+## Docker
+
+Проект можно поднять локально или на VPS через Docker Compose:
+
+1. Создай `.env` на основе `.env.example`.
+2. Проверь `BOT_TOKEN`, `ADMIN_ID`, `CHANNEL_ID`, `POSTGRES_*`.
+3. Запусти:
+
+```bash
+docker compose up -d --build
+```
+
+Проверить логи:
+
+```bash
+docker compose logs -f bot
+```
+
+Остановить:
+
+```bash
+docker compose down
+```
+
+Данные PostgreSQL хранятся в Docker volume `pg_data`.
+
 ## Timeweb деплой (Cloud Apps)
 
 1. Запушь проект в GitHub.
