@@ -406,9 +406,15 @@ async def moderation_actions(callback: CallbackQuery, bot: Bot, state: FSMContex
         photos = listing.photos or []
         try:
             if photos:
-                media = [InputMediaPhoto(media=file_id) for file_id in photos]
+                media = [InputMediaPhoto(media=photos[0], caption=text, parse_mode=None if listing.publication_text else "HTML")]
+                media.extend(InputMediaPhoto(media=file_id) for file_id in photos[1:])
                 await bot.send_media_group(chat_id=settings.channel_id, media=media)
-            await bot.send_message(chat_id=settings.channel_id, text=text, parse_mode=None if listing.publication_text else "HTML")
+            else:
+                await bot.send_message(
+                    chat_id=settings.channel_id,
+                    text=text,
+                    parse_mode=None if listing.publication_text else "HTML",
+                )
             await set_listing_status(listing_id, ListingStatus.published)
             await bot.send_message(chat_id=listing.user_id, text="Ваше объявление опубликовано.")
             logger.info("Listing %s published to channel %s", listing_id, settings.channel_id)
@@ -431,7 +437,7 @@ async def moderation_actions(callback: CallbackQuery, bot: Bot, state: FSMContex
         await set_listing_status(listing_id, ListingStatus.draft)
         await bot.send_message(
             chat_id=listing.user_id,
-            text=f"Модератор запросил правки по объявлению ID {listing.id}. Выберите поле:",
+            text=f"Модератор запросил правки по объявлению ID {listing.id}. Выберите поле для исправления:",
             reply_markup=edit_fields_kb(listing.id),
         )
         await callback.answer("Пользователь уведомлен")
@@ -442,7 +448,7 @@ async def moderation_actions(callback: CallbackQuery, bot: Bot, state: FSMContex
         await state.set_state(ListingForm.admin_edit_text)
         await state.update_data(admin_edit_listing_id=listing.id)
         await callback.message.answer(
-            "Пришлите полный текст объявления целиком. Он будет использоваться при публикации вместо автосборки."
+            "Пришлите полный текст объявления целиком одним сообщением. При публикации он уйдет в подпись к фото или отдельным постом, если фото нет."
         )
         await callback.answer("Жду текст")
         return
