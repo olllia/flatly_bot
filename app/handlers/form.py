@@ -477,7 +477,9 @@ async def moderation_actions(callback: CallbackQuery, bot: Bot, state: FSMContex
             admin_edit_message_id=callback.message.message_id if callback.message else None,
         )
         await callback.message.answer(
-            "Ниже отправила шаблон объявления отдельным сообщением. Скопируйте его, отредактируйте как хотите и пришлите новым сообщением. Я сохраню именно его верстку и emoji для публикации."
+            "Пришлите или перешлите сюда готовый пост для публикации одним сообщением.\n\n"
+            "Лучший вариант: одно фото с подписью или один текстовый пост.\n"
+            "Я сохраню именно это сообщение и потом опубликую его в канал кнопкой «Опубликовать»."
         )
         await _send_formatted_text(
             chat_id=callback.message.chat.id,
@@ -485,7 +487,7 @@ async def moderation_actions(callback: CallbackQuery, bot: Bot, state: FSMContex
             text=text,
             entities_data=payload.get("publication_entities"),
         )
-        await callback.answer("Жду текст")
+        await callback.answer("Жду готовый пост")
         return
 
     await callback.answer()
@@ -508,7 +510,7 @@ async def admin_edit_publication_text(message: Message, state: FSMContext, bot: 
         await message.answer("Сессия редактирования устарела.")
         return
     if not text.strip():
-        await message.answer("Текст не должен быть пустым.")
+        await message.answer("Пришлите готовый пост одним сообщением: текст или фото с подписью.")
         return
     if len(text) > 4000:
         await message.answer("Текст слишком длинный. Максимум 4000 символов.")
