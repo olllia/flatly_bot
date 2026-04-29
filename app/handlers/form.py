@@ -415,21 +415,29 @@ async def moderation_actions(callback: CallbackQuery, bot: Bot, state: FSMContex
     if action == "publish":
         payload = listing_to_text_payload(listing)
         text = format_listing_text(payload, username=listing.username)
-        entities = deserialize_entities(payload.get("publication_entities"))
+        publication_html = payload.get("publication_html")
         photos = listing.photos or []
         try:
             if photos:
-                first_media = InputMediaPhoto(media=photos[0], caption=text)
-                if listing.publication_text:
-                    first_media.caption_entities = entities
+                first_media = InputMediaPhoto(media=photos[0], caption=publication_html or text)
+                if publication_html:
+                    first_media.parse_mode = "HTML"
+                elif listing.publication_text:
+                    first_media.caption_entities = deserialize_entities(payload.get("publication_entities"))
                 else:
                     first_media.parse_mode = "HTML"
                 media = [first_media]
                 media.extend(InputMediaPhoto(media=file_id) for file_id in photos[1:])
                 await bot.send_media_group(chat_id=settings.channel_id, media=media)
             else:
-                if listing.publication_text:
-                    await bot.send_message(chat_id=settings.channel_id, text=text, entities=entities)
+                if publication_html:
+                    await bot.send_message(chat_id=settings.channel_id, text=publication_html, parse_mode="HTML")
+                elif listing.publication_text:
+                    await bot.send_message(
+                        chat_id=settings.channel_id,
+                        text=text,
+                        entities=deserialize_entities(payload.get("publication_entities")),
+                    )
                 else:
                     await bot.send_message(chat_id=settings.channel_id, text=text, parse_mode="HTML")
             await set_listing_status(listing_id, ListingStatus.published)
@@ -511,10 +519,12 @@ async def admin_edit_publication_text(message: Message, state: FSMContext, bot: 
         return
 
     entities = serialize_entities(message.entities or message.caption_entities)
+    publication_html = message.html_text
     updated = await update_listing_admin_fields(
         int(listing_id),
         {
             "publication_text": text,
+            "publication_html": publication_html,
             "publication_entities": entities,
             "publication_source_chat_id": message.chat.id,
             "publication_source_message_id": message.message_id,

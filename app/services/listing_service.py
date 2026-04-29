@@ -60,7 +60,9 @@ async def update_listing_fields(listing_id: int, payload: dict) -> Listing | Non
             setattr(listing, key, value)
 
         listing.publication_text = None
+        listing.publication_html = None
         listing.publication_entities = []
+        listing.publication_photos = []
         listing.publication_source_chat_id = None
         listing.publication_source_message_id = None
         listing.status = ListingStatus.draft
