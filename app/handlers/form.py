@@ -69,6 +69,13 @@ async def _send_preview(chat_message: Message, listing: Listing) -> None:
     await chat_message.answer(preview_text, reply_markup=preview_kb(listing.id))
 
 
+async def _send_formatted_text(chat_id: int, bot: Bot, text: str, entities_data: list[dict] | None = None) -> Message:
+    entities = deserialize_entities(entities_data)
+    if entities:
+        return await bot.send_message(chat_id=chat_id, text=text, entities=entities)
+    return await bot.send_message(chat_id=chat_id, text=text, parse_mode="HTML")
+
+
 def _validate_edit_value(field: str, raw: str):
     text = raw.strip()
     if field == "price":
@@ -454,6 +461,8 @@ async def moderation_actions(callback: CallbackQuery, bot: Bot, state: FSMContex
         return
 
     if action == "edittext":
+        payload = listing_to_text_payload(listing)
+        text = format_listing_text(payload, username=listing.username)
         await state.clear()
         await state.set_state(ListingForm.admin_edit_text)
         await state.update_data(
@@ -462,7 +471,13 @@ async def moderation_actions(callback: CallbackQuery, bot: Bot, state: FSMContex
             admin_edit_message_id=callback.message.message_id if callback.message else None,
         )
         await callback.message.answer(
-            "Пришлите новый полный текст объявления одним сообщением. Я сохраню его как финальный вариант для публикации."
+            "Ниже отправила шаблон объявления отдельным сообщением. Скопируйте его, отредактируйте как хотите и пришлите новым сообщением. Я сохраню именно его верстку и emoji для публикации."
+        )
+        await _send_formatted_text(
+            chat_id=callback.message.chat.id,
+            bot=bot,
+            text=text,
+            entities_data=payload.get("publication_entities"),
         )
         await callback.answer("Жду текст")
         return
@@ -508,15 +523,20 @@ async def admin_edit_publication_text(message: Message, state: FSMContext, bot: 
             await bot.edit_message_text(
                 chat_id=chat_id,
                 message_id=message_id,
-                text=text,
-                entities=deserialize_entities(updated.publication_entities),
+                text=f"Новая заявка на модерацию (ID: {updated.id})\n\nТекст для публикации обновлен.",
                 reply_markup=moderation_kb_initial(updated.id),
             )
         except TelegramAPIError:
             logger.exception("Failed to update moderation preview for listing %s", updated.id)
             await message.answer("Текст сохранен, но превью в сообщении не обновилось.")
 
-    await message.answer("Готово. Обновила текст объявления для публикации.")
+    await message.answer("Готово. Сохранила текст для публикации. Ниже текущая версия:")
+    await _send_formatted_text(
+        chat_id=message.chat.id,
+        bot=bot,
+        text=updated.publication_text or text,
+        entities_data=updated.publication_entities,
+    )
     await state.clear()
 
 
