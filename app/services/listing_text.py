@@ -1,3 +1,5 @@
+from aiogram.types import MessageEntity
+
 from app.keyboards.listing_form import AMENITIES, OWNER_TYPES, PROPERTY_TYPES
 
 TRAVEL_TYPES_RU = {
@@ -59,6 +61,18 @@ def format_listing_text(data: dict, username: str) -> str:
     )
 
 
+def serialize_entities(entities: list[MessageEntity] | None) -> list[dict]:
+    if not entities:
+        return []
+    return [entity.model_dump(exclude_none=True) for entity in entities]
+
+
+def deserialize_entities(entities: list[dict] | None) -> list[MessageEntity] | None:
+    if not entities:
+        return None
+    return [MessageEntity.model_validate(entity) for entity in entities]
+
+
 def listing_to_text_payload(listing) -> dict:
     amenities = listing.amenities or []
     return {
@@ -74,5 +88,6 @@ def listing_to_text_payload(listing) -> dict:
         "address": listing.address,
         "description": listing.description,
         "publication_text": listing.publication_text,
+        "publication_entities": listing.publication_entities or [],
         "amenities": amenities,
     }
