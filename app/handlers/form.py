@@ -418,13 +418,7 @@ async def moderation_actions(callback: CallbackQuery, bot: Bot, state: FSMContex
         entities = deserialize_entities(payload.get("publication_entities"))
         photos = listing.photos or []
         try:
-            if listing.publication_source_chat_id and listing.publication_source_message_id:
-                await bot.copy_message(
-                    chat_id=settings.channel_id,
-                    from_chat_id=listing.publication_source_chat_id,
-                    message_id=listing.publication_source_message_id,
-                )
-            elif photos:
+            if photos:
                 first_media = InputMediaPhoto(media=photos[0], caption=text)
                 if listing.publication_text:
                     first_media.caption_entities = entities
@@ -478,8 +472,8 @@ async def moderation_actions(callback: CallbackQuery, bot: Bot, state: FSMContex
         )
         await callback.message.answer(
             "Пришлите или перешлите сюда готовый пост для публикации одним сообщением.\n\n"
-            "Лучший вариант: одно фото с подписью или один текстовый пост.\n"
-            "Я сохраню именно это сообщение и потом опубликую его в канал кнопкой «Опубликовать»."
+            "Мне нужен только текст поста с вашим оформлением и emoji.\n"
+            "Фото в публикации всегда будут исходные, от пользователя."
         )
         await _send_formatted_text(
             chat_id=callback.message.chat.id,
@@ -510,7 +504,7 @@ async def admin_edit_publication_text(message: Message, state: FSMContext, bot: 
         await message.answer("Сессия редактирования устарела.")
         return
     if not text.strip():
-        await message.answer("Пришлите готовый пост одним сообщением: текст или фото с подписью.")
+        await message.answer("Пришлите текст поста одним сообщением. Фото брать не нужно, я оставлю фото пользователя.")
         return
     if len(text) > 4000:
         await message.answer("Текст слишком длинный. Максимум 4000 символов.")
