@@ -89,5 +89,7 @@ def listing_to_text_payload(listing) -> dict:
         "description": listing.description,
         "publication_text": listing.publication_text,
         "publication_entities": listing.publication_entities or [],
+        "publication_source_chat_id": listing.publication_source_chat_id,
+        "publication_source_message_id": listing.publication_source_message_id,
         "amenities": amenities,
     }

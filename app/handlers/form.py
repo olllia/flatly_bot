@@ -418,7 +418,13 @@ async def moderation_actions(callback: CallbackQuery, bot: Bot, state: FSMContex
         entities = deserialize_entities(payload.get("publication_entities"))
         photos = listing.photos or []
         try:
-            if photos:
+            if listing.publication_source_chat_id and listing.publication_source_message_id:
+                await bot.copy_message(
+                    chat_id=settings.channel_id,
+                    from_chat_id=listing.publication_source_chat_id,
+                    message_id=listing.publication_source_message_id,
+                )
+            elif photos:
                 first_media = InputMediaPhoto(media=photos[0], caption=text)
                 if listing.publication_text:
                     first_media.caption_entities = entities
@@ -496,7 +502,7 @@ async def admin_edit_publication_text(message: Message, state: FSMContext, bot: 
     listing_id = data.get("admin_edit_listing_id")
     chat_id = data.get("admin_edit_chat_id")
     message_id = data.get("admin_edit_message_id")
-    text = message.text or ""
+    text = message.text or message.caption or ""
     if not listing_id:
         await state.clear()
         await message.answer("Сессия редактирования устарела.")
@@ -508,10 +514,15 @@ async def admin_edit_publication_text(message: Message, state: FSMContext, bot: 
         await message.answer("Текст слишком длинный. Максимум 4000 символов.")
         return
 
-    entities = serialize_entities(message.entities)
+    entities = serialize_entities(message.entities or message.caption_entities)
     updated = await update_listing_admin_fields(
         int(listing_id),
-        {"publication_text": text, "publication_entities": entities},
+        {
+            "publication_text": text,
+            "publication_entities": entities,
+            "publication_source_chat_id": message.chat.id,
+            "publication_source_message_id": message.message_id,
+        },
     )
     if not updated:
         await state.clear()
@@ -530,13 +541,7 @@ async def admin_edit_publication_text(message: Message, state: FSMContext, bot: 
             logger.exception("Failed to update moderation preview for listing %s", updated.id)
             await message.answer("Текст сохранен, но превью в сообщении не обновилось.")
 
-    await message.answer("Готово. Сохранила текст для публикации. Ниже текущая версия:")
-    await _send_formatted_text(
-        chat_id=message.chat.id,
-        bot=bot,
-        text=updated.publication_text or text,
-        entities_data=updated.publication_entities,
-    )
+    await message.answer("Готово. Сохранила именно это сообщение как финальную версию для публикации.")
     await state.clear()
 
 

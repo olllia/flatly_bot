@@ -49,6 +49,8 @@ class Listing(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     publication_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     publication_entities: Mapped[list[dict]] = mapped_column(JSONB, default=list, nullable=False)
+    publication_source_chat_id: Mapped[int | None] = mapped_column(BIGINT, nullable=True)
+    publication_source_message_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     amenities: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
     photos: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
     status: Mapped[ListingStatus] = mapped_column(
