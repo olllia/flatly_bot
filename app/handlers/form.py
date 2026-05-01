@@ -29,16 +29,9 @@ from app.services.listing_service import (
     create_or_update_draft,
     get_listing_by_id,
     set_listing_status,
-    update_listing_admin_fields,
     update_listing_fields,
 )
-from app.services.listing_text import (
-    deserialize_entities,
-    downgrade_custom_emoji_html,
-    format_listing_text,
-    listing_to_text_payload,
-    serialize_entities,
-)
+from app.services.listing_text import format_listing_text, listing_to_text_payload
 from app.states.listing_form import ListingForm
 from app.utils.validators import to_positive_int, to_positive_number
 
@@ -72,13 +65,6 @@ async def _send_preview(chat_message: Message, listing: Listing) -> None:
         media = [InputMediaPhoto(media=file_id) for file_id in photos]
         await chat_message.answer_media_group(media=media)
     await chat_message.answer(preview_text, reply_markup=preview_kb(listing.id))
-
-
-async def _send_formatted_text(chat_id: int, bot: Bot, text: str, entities_data: list[dict] | None = None) -> Message:
-    entities = deserialize_entities(entities_data)
-    if entities:
-        return await bot.send_message(chat_id=chat_id, text=text, entities=entities)
-    return await bot.send_message(chat_id=chat_id, text=text, parse_mode="HTML")
 
 
 def _validate_edit_value(field: str, raw: str):
@@ -402,7 +388,7 @@ async def preview_actions(callback: CallbackQuery, state: FSMContext, bot: Bot) 
 
 
 @router.callback_query(F.data.startswith("mod:"))
-async def moderation_actions(callback: CallbackQuery, bot: Bot, state: FSMContext) -> None:
+async def moderation_actions(callback: CallbackQuery, bot: Bot) -> None:
     if not callback.data:
         await callback.answer()
         return
@@ -420,32 +406,16 @@ async def moderation_actions(callback: CallbackQuery, bot: Bot, state: FSMContex
     if action == "publish":
         payload = listing_to_text_payload(listing)
         text = format_listing_text(payload, username=listing.username)
-        publication_html = downgrade_custom_emoji_html(payload.get("publication_html"))
         photos = listing.photos or []
         target_chat_id = _target_publication_chat_id()
         try:
             if photos:
-                first_media = InputMediaPhoto(media=photos[0], caption=publication_html or text)
-                if publication_html:
-                    first_media.parse_mode = "HTML"
-                elif listing.publication_text:
-                    first_media.caption_entities = deserialize_entities(payload.get("publication_entities"))
-                else:
-                    first_media.parse_mode = "HTML"
+                first_media = InputMediaPhoto(media=photos[0], caption=text, parse_mode="HTML")
                 media = [first_media]
                 media.extend(InputMediaPhoto(media=file_id) for file_id in photos[1:])
                 await bot.send_media_group(chat_id=target_chat_id, media=media)
             else:
-                if publication_html:
-                    await bot.send_message(chat_id=target_chat_id, text=publication_html, parse_mode="HTML")
-                elif listing.publication_text:
-                    await bot.send_message(
-                        chat_id=target_chat_id,
-                        text=text,
-                        entities=deserialize_entities(payload.get("publication_entities")),
-                    )
-                else:
-                    await bot.send_message(chat_id=target_chat_id, text=text, parse_mode="HTML")
+                await bot.send_message(chat_id=target_chat_id, text=text, parse_mode="HTML")
             await set_listing_status(listing_id, ListingStatus.published)
             await bot.send_message(
                 chat_id=listing.user_id,
@@ -477,87 +447,7 @@ async def moderation_actions(callback: CallbackQuery, bot: Bot, state: FSMContex
         await callback.answer("Пользователь уведомлен")
         return
 
-    if action == "edittext":
-        payload = listing_to_text_payload(listing)
-        text = format_listing_text(payload, username=listing.username)
-        await state.clear()
-        await state.set_state(ListingForm.admin_edit_text)
-        await state.update_data(
-            admin_edit_listing_id=listing.id,
-            admin_edit_chat_id=callback.message.chat.id if callback.message else None,
-            admin_edit_message_id=callback.message.message_id if callback.message else None,
-        )
-        await callback.message.answer(
-            "Пришлите или перешлите сюда готовый пост для публикации одним сообщением.\n\n"
-            "Мне нужен только текст поста с вашим оформлением и emoji.\n"
-            "Фото в публикации всегда будут исходные, от пользователя."
-        )
-        await _send_formatted_text(
-            chat_id=callback.message.chat.id,
-            bot=bot,
-            text=text,
-            entities_data=payload.get("publication_entities"),
-        )
-        await callback.answer("Жду готовый пост")
-        return
-
     await callback.answer()
-
-
-@router.message(ListingForm.admin_edit_text)
-async def admin_edit_publication_text(message: Message, state: FSMContext, bot: Bot) -> None:
-    if not message.from_user or message.from_user.id != settings.admin_id:
-        await state.clear()
-        await message.answer("Только администратор может редактировать финальный текст.")
-        return
-
-    data = await state.get_data()
-    listing_id = data.get("admin_edit_listing_id")
-    chat_id = data.get("admin_edit_chat_id")
-    message_id = data.get("admin_edit_message_id")
-    text = message.text or message.caption or ""
-    if not listing_id:
-        await state.clear()
-        await message.answer("Сессия редактирования устарела.")
-        return
-    if not text.strip():
-        await message.answer("Пришлите текст поста одним сообщением. Фото брать не нужно, я оставлю фото пользователя.")
-        return
-    if len(text) > 4000:
-        await message.answer("Текст слишком длинный. Максимум 4000 символов.")
-        return
-
-    entities = serialize_entities(message.entities or message.caption_entities)
-    publication_html = message.html_text
-    updated = await update_listing_admin_fields(
-        int(listing_id),
-        {
-            "publication_text": text,
-            "publication_html": publication_html,
-            "publication_entities": entities,
-            "publication_source_chat_id": message.chat.id,
-            "publication_source_message_id": message.message_id,
-        },
-    )
-    if not updated:
-        await state.clear()
-        await message.answer("Не удалось сохранить текст объявления.")
-        return
-
-    if chat_id and message_id:
-        try:
-            await bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=message_id,
-                text=f"Новая заявка на модерацию (ID: {updated.id})\n\nТекст для публикации обновлен.",
-                reply_markup=moderation_kb_initial(updated.id),
-            )
-        except TelegramAPIError:
-            logger.exception("Failed to update moderation preview for listing %s", updated.id)
-            await message.answer("Текст сохранен, но превью в сообщении не обновилось.")
-
-    await message.answer("Готово. Сохранила именно это сообщение как финальную версию для публикации.")
-    await state.clear()
 
 
 @router.callback_query(F.data.startswith("editfield:"))

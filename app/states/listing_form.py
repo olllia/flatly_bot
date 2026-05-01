@@ -17,4 +17,3 @@ class ListingForm(StatesGroup):
     photos = State()
     edit_value = State()
     edit_photos = State()
-    admin_edit_text = State()
