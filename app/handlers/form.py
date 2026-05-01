@@ -34,6 +34,7 @@ from app.services.listing_service import (
 )
 from app.services.listing_text import (
     deserialize_entities,
+    downgrade_custom_emoji_html,
     format_listing_text,
     listing_to_text_payload,
     serialize_entities,
@@ -44,6 +45,10 @@ from app.utils.validators import to_positive_int, to_positive_number
 router = Router()
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+
+def _target_publication_chat_id() -> int:
+    return settings.draft_channel_id or settings.channel_id
 
 
 @router.message(Command("new"))
@@ -415,8 +420,9 @@ async def moderation_actions(callback: CallbackQuery, bot: Bot, state: FSMContex
     if action == "publish":
         payload = listing_to_text_payload(listing)
         text = format_listing_text(payload, username=listing.username)
-        publication_html = payload.get("publication_html")
+        publication_html = downgrade_custom_emoji_html(payload.get("publication_html"))
         photos = listing.photos or []
+        target_chat_id = _target_publication_chat_id()
         try:
             if photos:
                 first_media = InputMediaPhoto(media=photos[0], caption=publication_html or text)
@@ -428,26 +434,29 @@ async def moderation_actions(callback: CallbackQuery, bot: Bot, state: FSMContex
                     first_media.parse_mode = "HTML"
                 media = [first_media]
                 media.extend(InputMediaPhoto(media=file_id) for file_id in photos[1:])
-                await bot.send_media_group(chat_id=settings.channel_id, media=media)
+                await bot.send_media_group(chat_id=target_chat_id, media=media)
             else:
                 if publication_html:
-                    await bot.send_message(chat_id=settings.channel_id, text=publication_html, parse_mode="HTML")
+                    await bot.send_message(chat_id=target_chat_id, text=publication_html, parse_mode="HTML")
                 elif listing.publication_text:
                     await bot.send_message(
-                        chat_id=settings.channel_id,
+                        chat_id=target_chat_id,
                         text=text,
                         entities=deserialize_entities(payload.get("publication_entities")),
                     )
                 else:
-                    await bot.send_message(chat_id=settings.channel_id, text=text, parse_mode="HTML")
+                    await bot.send_message(chat_id=target_chat_id, text=text, parse_mode="HTML")
             await set_listing_status(listing_id, ListingStatus.published)
-            await bot.send_message(chat_id=listing.user_id, text="Ваше объявление опубликовано.")
-            logger.info("Listing %s published to channel %s", listing_id, settings.channel_id)
-            await callback.answer("Опубликовано")
+            await bot.send_message(
+                chat_id=listing.user_id,
+                text="Ваше объявление отправлено в канал-черновик и ожидает ручной публикации администратором.",
+            )
+            logger.info("Listing %s published to draft channel %s", listing_id, target_chat_id)
+            await callback.answer("Отправлено в черновик")
         except TelegramAPIError:
-            logger.exception("Failed to publish listing %s to channel %s", listing_id, settings.channel_id)
+            logger.exception("Failed to publish listing %s to draft channel %s", listing_id, target_chat_id)
             await callback.message.answer(
-                "Не удалось опубликовать объявление в канал. Проверьте, что бот добавлен в канал и имеет право публиковать сообщения."
+                "Не удалось отправить объявление в канал-черновик. Проверьте, что бот добавлен в канал и имеет право публиковать сообщения."
             )
             await callback.answer("Ошибка публикации", show_alert=True)
         return

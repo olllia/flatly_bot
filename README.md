@@ -35,7 +35,7 @@ Telegram-бот для публикации объявлений аренды ж
 Проект можно поднять локально или на VPS через Docker Compose:
 
 1. Создай `.env` на основе `.env.example`.
-2. Проверь `BOT_TOKEN`, `ADMIN_ID`, `CHANNEL_ID`, `POSTGRES_*`.
+2. Проверь `BOT_TOKEN`, `ADMIN_ID`, `CHANNEL_ID`, `DRAFT_CHANNEL_ID`, `POSTGRES_*`.
 3. Запусти:
 
 ```bash
@@ -69,6 +69,7 @@ docker compose down
    - `BOT_TOKEN`
    - `ADMIN_ID`
    - `CHANNEL_ID`
+   - `DRAFT_CHANNEL_ID`
    - `DATABASE_URL` в формате `postgresql+asyncpg://...`
 7. Запусти деплой.
 
