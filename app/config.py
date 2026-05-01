@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     bot_token: str = Field(alias="BOT_TOKEN")
     admin_id: int = Field(alias="ADMIN_ID")
     channel_id: int = Field(alias="CHANNEL_ID")
-    draft_channel_id: int | None = Field(default=None, alias="DRAFT_CHANNEL_ID")
+    draft_channel_id: int = Field(alias="DRAFT_CHANNEL_ID")
     database_url: str = Field(alias="DATABASE_URL")
 
 

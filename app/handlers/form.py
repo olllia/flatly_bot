@@ -48,7 +48,7 @@ settings = get_settings()
 
 
 def _target_publication_chat_id() -> int:
-    return settings.draft_channel_id or settings.channel_id
+    return settings.draft_channel_id
 
 
 @router.message(Command("new"))
